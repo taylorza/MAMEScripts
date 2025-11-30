@@ -3,8 +3,27 @@
 Lightweight collection of Lua helper scripts and plugins for MAME.
 
 ## Repository layout
-- `scripts/`: Lua scripts you can load into MAME.
 - `plugins/`: MAME plugins you can load into MAME.
+- `scripts/`: Lua scripts you can load into MAME.
+
+
+## Plugins
+**dezog**
+
+Add support for DZRP - DeZog Remote Protocol 
+
+Using the CSpect debug configuration in Visual Studio Code the plugin will allow you to debug against MAME.
+
+Notes
+* Current Windows builds of MAME has an issue, a pull request to fix the issue has been submitted (https://github.com/mamedev/mame/issues/14600)
+
+* All CSpect DZRP messages are implemented except the 4 SPRITE commands
+  * CMD_GET_SPRITES_PALETTE
+  * CMD_GET_SPRITES_CLIP_WINDOW_AND_CONTROL
+  * CMD_GET_SPRITES
+  * CMD_GET_SPRITE_PATTERNS
+  
+---
 
 ## Scripts
 **faststart.lua**

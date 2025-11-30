@@ -1,0 +1,10 @@
+{
+    "plugin": {
+        "name": "dezog",
+        "description": "DeZog plugin for advanced debugging.",
+        "author": "Chris Taylor (taylorza)",
+        "version": "0.1",
+        "start": "false",
+        "type": "plugin"
+    }
+}
