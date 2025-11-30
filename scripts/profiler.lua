@@ -8,8 +8,7 @@
 --  Stoping an already stopped timer will reset that timer 
 
 local machine = manager.machine
-local cpu = machine.devices[":maincpu"]
-local io = cpu.spaces["io"]
+local nreg = manager.machine.devices[":regs_map"].spaces["program"]
 local screen = machine.screens[':screen']
 
 -- Timers
@@ -24,53 +23,40 @@ local timers={
     {enabled=false, start=emu.attotime(), duration=0.0, color=0x6640e0d0},
 }
 
--- Selected Next Register
-local reg=-1
-
--- Tap port $243b to track NEXTREG selection
-tap_io_243B = io:install_write_tap(0x243b, 0x243b, "IO_243B", 
+-- Tap nextreg 7F writes 
+tap_nreg_7f = nreg:install_write_tap(0x7f, 0x7f, "NREG_7F", 
     function(offset, data, mask)
-        reg = data
-    end
-)
-
--- Tap port $253b to track writes to NEXTREG
-tap_io_253B = io:install_write_tap(0x253b, 0x253b, "IO_253B", 
-    function(offset, data, mask)
-        -- Check if writing to User NEXTREG 127 ($7f)
-        if reg == 127 then
-            if data == 0 then 
-                -- Disable and reset all timers
-                for i = 1, 8 do
-                    local timer = timers[i]
-                    timer.enabled = false
-                    timer.start = emu.attotime()
-                    timer.duration = 0.0
-                end
-            elseif data > 127 then 
-                -- Disable timer at abs(value)
-                local i = 256-data
-                local timer = timers[i]       
-
-                if timer.enabled then
-                    local delta = machine.time - timer.start
-                    timer.duration = delta:as_double()
-                    timer.enabled = false  
-                else
-                    -- Reset the timer if already disabled
-                    timer.duration = 0.0                  
-                end
-            else
-                -- Start timer
-                local i = data
+        if data == 0 then 
+            -- Disable and reset all timers
+            for i = 1, 8 do
                 local timer = timers[i]
-                if not timer.enabled then
-                    timer.enabled = true
-                    timer.start = machine.time
-                    timer.duration = 0.0
-                end
+                timer.enabled = false
+                timer.start = emu.attotime()
+                timer.duration = 0.0
             end
-        end
+        elseif data > 127 then 
+            -- Disable timer at abs(value)
+            local i = 256-data
+            local timer = timers[i]       
+
+            if timer.enabled then
+                local delta = machine.time - timer.start
+                timer.duration = delta:as_double()
+                timer.enabled = false  
+            else
+                -- Reset the timer if already disabled
+                timer.duration = 0.0                  
+            end
+        else
+            -- Start timer
+            local i = data
+            local timer = timers[i]
+            if not timer.enabled then
+                timer.enabled = true
+                timer.start = machine.time
+                timer.duration = 0.0
+            end
+        end        
     end
 )
 
