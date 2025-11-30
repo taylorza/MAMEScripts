@@ -30,32 +30,12 @@ local regmap_inv = {"PC", "SP", "AF", "BC", "DE", "HL", "IX", "IY",
 --                   34,  35
                     "R", "I"}  
 
--- Need a better way to access the Next specific registers
-function dezog.readreg(reg)
-    local cpu = manager.machine.devices[":maincpu"]
-    local io = cpu.spaces["io"]
-
-    local oldreg = io:readv_u8(0x243b)
-    io:writev_u8(0x243b, reg)
-    local value = io:readv_u8(0x253b)
-    io:writev_u8(0x243b, oldreg)
-    return value
-end
-
-function dezog.writereg(reg, value)
-    local cpu = manager.machine.devices[":maincpu"]
-    local io = cpu.spaces["io"]
-
-    local oldreg = io:readv_u8(0x243b)
-    io:writev_u8(0x243b, reg)
-    io:writev_u8(0x253b, value)
-    io:writev_u8(0x243b, oldreg)
-    return value
-end
-
 function dezog.startplugin()
     local debugger
     local cpu
+    local mem
+    local nregs
+
     local break_reason = 0
     local last_state = nil
 
@@ -76,6 +56,9 @@ function dezog.startplugin()
                 print("dezog: maincpu not found")
             end
 
+            mem = cpu.spaces["program"]
+            nregs = manager.machine.devices[":regs_map"].spaces["program"]
+
             initialized = false
             socket_open = false
             debugger.execution_state="run"            
@@ -84,6 +67,8 @@ function dezog.startplugin()
 
     stop_subscription = emu.add_machine_stop_notifier(function ()
         cpu = nil
+        mem = nil
+        nregs = nil
         debugger = nil    
         initialized = false
         socket_open = false
@@ -136,15 +121,15 @@ function dezog.startplugin()
                 socket_open = false
                 response = nil
             elseif cmdid == 3 then -- CMD_GET_REGISTERS
-                print("dezog: CMD_GET_REGISTERS")
-                local bank0 = dezog.readreg(0x50)
-                local bank1 = dezog.readreg(0x51)
-                local bank2 = dezog.readreg(0x52)
-                local bank3 = dezog.readreg(0x53)
-                local bank4 = dezog.readreg(0x54)
-                local bank5 = dezog.readreg(0x55)
-                local bank6 = dezog.readreg(0x56)
-                local bank7 = dezog.readreg(0x57)
+                print("dezog: CMD_GET_REGISTERS")                
+                local bank0 = nregs:readv_u8(0x50)
+                local bank1 = nregs:readv_u8(0x51)
+                local bank2 = nregs:readv_u8(0x52)
+                local bank3 = nregs:readv_u8(0x53)
+                local bank4 = nregs:readv_u8(0x54)
+                local bank5 = nregs:readv_u8(0x55)
+                local bank6 = nregs:readv_u8(0x56)
+                local bank7 = nregs:readv_u8(0x57)
                 
                 response = string.pack("<I2<I2<I2<I2<I2<I2<I2<I2<I2<I2<I2<I2I1I1I1I1I1I1I1I1I1I1I1I1I1",
                 cpu.state["PC"].value,
@@ -175,7 +160,7 @@ function dezog.startplugin()
             elseif cmdid == 5 then -- CMD_WRITE_BANK
                 print("dezog: CMD_WRITE_BANK")
                 local banknum = string.unpack("I1", payload)
-                local mem = cpu.spaces["program"]
+                
                 local ss=""
                 for i=1, len-1 do
                     mem:writev_u8(banknum * 0x2000 + (i - 1), string.byte(payload, i + 1))                    
@@ -204,7 +189,7 @@ function dezog.startplugin()
             elseif cmdid == 8 then -- CMD_READ_MEM
                 print("dezog: CMD_READ_MEM")
                 local reserved, addr, size = string.unpack("I1I2I2", payload)
-                local mem = cpu.spaces["program"]
+                
                 local bytes = ""
                 for i=0, size-1 do
                     bytes = bytes .. string.char(mem:readv_u8(addr + i))
@@ -213,7 +198,7 @@ function dezog.startplugin()
             elseif cmdid == 9 then -- CMD_WRITE_MEM
                 print("dezog: CMD_WRITE_MEM")
                 local reserved, addr = string.unpack("I1I2", payload)
-                local mem = cpu.spaces["program"]
+                
                 local ss=""
                 for i=4, len do
                     mem:writev_u8(addr + (i - 4), string.byte(payload, i))                    
@@ -221,13 +206,14 @@ function dezog.startplugin()
                 response = nil
             elseif cmdid == 10 then -- CMD_SET_SLOT
                 print("dezog: CMD_SET_SLOT")
+                
                 local slotnum, bank = string.unpack("I1I1", payload)
-                dezog.writereg(0x50 + slotnum, bank)
+                nregs:writev_u8(0x50 + slotnum, bank)                
                 response = string.pack("I1", 0)
             elseif cmdid == 11 then -- CMD_GET_TBBLUE_REG
                 print("dezog: CMD_GET_TBBLUE_REG")
                 local regnum = string.unpack("I1", payload)
-                local value = dezog.readreg(regnum)
+                local value = nregs:readv_u8(regnum)
                 response = string.pack("I1", value)
             elseif cmdid == 12 then -- CMD_SET_BORDER
                 print("dezog: CMD_SET_BORDER (not implemented)")
