@@ -187,15 +187,17 @@ function dezog.startplugin()
                 reponse = nil
             elseif cmdid == 5 then -- CMD_WRITE_BANK                
                 local banknum = string.unpack("I1", payload)
-                local bankaddr = 0x40000 + (banknum * 0x2000)
                 if enable_logging then
                     print("dezog: CMD_WRITE_BANK")
-                    print("dezog: CMD_WRITE_BANK", banknum, string.format("0x%05X", bankaddr))
+                    print("dezog: CMD_WRITE_BANK", banknum)
                 end                
-                local sram = emu.item(manager.machine.devices[":ram"].items["0/m_pointer"])
+                -- do memory writes by paging to MMU7 rather than direct to main SRAM
+                local mmu7bank = nregs:readv_u8(0x57) -- store current bank at MMU7
+                nregs:writev_u8(0x57, banknum) -- page bank to MMU7
                 for i=1, len-1 do
-                    sram:write(bankaddr + (i - 1), string.byte(payload, i + 1))            
-                end                
+                  mem:writev_u8(0xE000 + (i - 1), string.byte(payload, i + 1)) -- write to MMU7         
+                end
+                nregs:writev_u8(0x57, mmu7bank) -- restore previous bank at MMU7               
                 response = string.pack("I1c1", 0, "\0")
             elseif cmdid == 6 then -- CMD_CONTINUE
                 if enable_logging then
